@@ -1,0 +1,9 @@
+import type { RequestHandler } from "express";
+import bcrypt from "bcryptjs"; import jwt from "jsonwebtoken";
+import { z } from "zod";
+import { User } from "../models/User"; import { authSchema } from "../validators/schemas"; import { AppError } from "../utils/errors";
+const token = (id: string) => jwt.sign({}, process.env.JWT_SECRET!, { subject: id, expiresIn: "7d" });
+export const register: RequestHandler = async (req,res) => { const data=authSchema.extend({name:authSchema.shape.name.unwrap()}).parse(req.body); if(await User.exists({email:data.email.toLowerCase()})) throw new AppError(409,"Email is already registered"); const user=await User.create({name:data.name,email:data.email,passwordHash:await bcrypt.hash(data.password,12)}); res.status(201).json({success:true,data:{token:token(user.id),user:{id:user.id,name:user.name,email:user.email,currency:user.currency}}}); };
+export const login: RequestHandler = async (req,res) => { const data=authSchema.omit({name:true}).parse(req.body); const user=await User.findOne({email:data.email.toLowerCase()}).select("+passwordHash"); if(!user||!await bcrypt.compare(data.password,user.passwordHash)) throw new AppError(401,"Invalid email or password"); res.json({success:true,data:{token:token(user.id),user:{id:user.id,name:user.name,email:user.email,currency:user.currency}}}); };
+export const me: RequestHandler = async (req,res) => { const user=await User.findById(req.userId); if(!user) throw new AppError(404,"User not found"); res.json({success:true,data:user}); };
+export const updateMe: RequestHandler = async (req,res) => { const data=z.object({name:z.string().trim().min(2),currency:z.enum(["INR"]).default("INR")}).parse(req.body); const user=await User.findByIdAndUpdate(req.userId,data,{returnDocument: "after",runValidators:true}); if(!user) throw new AppError(404,"User not found"); res.json({success:true,data:user}); };

@@ -1,0 +1,1 @@
+import dotenv from"dotenv";import{connectDatabase,disconnectDatabase}from"./config/database";import{processDueRecurring}from"./services/recurring";dotenv.config();connectDatabase().then(()=>processDueRecurring()).then(async result=>{console.log(result);await disconnectDatabase()}).catch(e=>{console.error(e);process.exit(1)});
