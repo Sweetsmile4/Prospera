@@ -95,9 +95,9 @@ describe("V2 integration: recurring, import, liabilities, investments, goals, bu
   });
 it("recurring expense generates exactly one transaction and decreases the account", async () => {
     const rule = await RecurringTransaction.create({ userId: userA._id, title: "Rent", type: "expense", amount: 8000, accountId: accountA._id, categoryId: expenseCat._id, frequency: "monthly", startDate: new Date(Date.now() - 40 * 864e5), nextRunDate: new Date(Date.now() - 30 * 864e5) });
-    const first = await payOccurrence(userA._id, String(rule._id));
+    const first = await payOccurrence(userA._id, String(rule._id), rule.nextRunDate);
     expect(first.generated).toBe(true);
-    const second = await payOccurrence(userA._id, String(rule._id));
+    const second = await payOccurrence(userA._id, String(rule._id), rule.nextRunDate);
     expect(second.generated).toBe(false);
     const txs = await Transaction.find({ userId: userA._id, recurringTransactionId: rule._id });
     expect(txs).toHaveLength(1);

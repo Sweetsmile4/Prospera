@@ -1,5 +1,6 @@
 import { ClientSession, Types } from "mongoose";
 import { Goal } from "../models/Goal";
+import { SinkingFund } from "../models/SinkingFund";
 import { Transaction } from "../models/Transaction";
 import { Liability } from "../models/Liability";
 import { InvestmentHolding } from "../models/InvestmentHolding";
@@ -9,6 +10,19 @@ import type { TxInput } from "./transactions";
 // Stored deltas make reversals independent of later market valuations.
 export async function applyDomainImpact(userId: Types.ObjectId, tx: TxInput, direction: 1|-1, session: ClientSession) {
   const m = tx.metadata;
+  if(m?.kind==="sinking_fund_contribution"){
+    if(tx.type!=="saving"||tx.goalId)throw new AppError(400,"Invalid sinking fund contribution");
+    const fund=await SinkingFund.findOne({_id:m.sinkingFundId,userId}).session(session);
+    if(!fund)throw new AppError(404,"Sinking fund not found");
+    if(direction===1&&fund.status!=="active")throw new AppError(400,"Fund is not active");
+    if(String(fund.linkedAccountId||"")!==String(tx.destinationAccountId||""))throw new AppError(400,"Contribution destination must match the fund account");
+    const next=fund.currentAmount+tx.amount*direction;
+    if(next<-.005)throw new AppError(409,"Cannot reverse a contribution that has already been used");
+    fund.currentAmount=Math.max(0,Math.round(next*100)/100);
+    if(fund.currentAmount>=fund.targetAmount)fund.status="completed";
+    else if(fund.status==="completed")fund.status="active";
+    await fund.save({session});
+  }
   if(tx.goalId) {
     if(tx.type!=="saving" || (m?.kind && m.kind!=="goal_withdrawal")) throw new AppError(400,"Goals require saving transactions");
     const goal=await Goal.findOneAndUpdate({_id:tx.goalId,userId},{$inc:{ledgerVersion:1}},{session,returnDocument: "after"});

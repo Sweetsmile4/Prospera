@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "seed": "ts-node src/seed.ts && ts-node src/seedV2.ts",
     "seed:v2": "ts-node src/seedV2.ts",
+    "seed:v3": "ts-node src/seedV3.ts",
     "test": "vitest run",
     "process-recurring": "ts-node src/processRecurring.ts"
   },

@@ -6,6 +6,7 @@ const categorySchema = new Schema({
   type: { type: String, enum: categoryTypes, required: true },
   icon: { type: String, default: "circle" },
   isDefault: { type: Boolean, default: false },
+  isEssential: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 categorySchema.index({ userId: 1, name: 1, type: 1 }, { unique: true });

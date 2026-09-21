@@ -2,13 +2,16 @@
 import { TransactionFormV2 } from "@/components/transaction-form-v2";
 import { TransactionDetailsV2 } from "@/components/transaction-details-v2";
 import { ExportTransactions } from "@/components/export-transactions";
-import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query"; import { useSearchParams } from "next/navigation"; import Link from "next/link"; import { useEffect,useMemo,useState } from "react"; import { api,money } from "@/lib/api"; import type { Account,Category,Goal,Tx } from "@/lib/types"; import { Page,Empty } from "@/components/page"; import { Modal } from "@/components/modal"; import { Trash2,Pencil,Eye,Search,SlidersHorizontal } from "lucide-react";
+import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query"; import { useSearchParams } from "next/navigation"; import Link from "next/link"; import { useMemo,useState } from "react"; import { api,money } from "@/lib/api"; import type { Account,Category,Goal,Tx } from "@/lib/types"; import { Page,Empty } from "@/components/page"; import { Modal } from "@/components/modal"; import { Trash2,Pencil,Eye,Search,SlidersHorizontal } from "lucide-react";
 const types=["all","income","expense","saving","investment","transfer"] as const;
 type Result={items:Tx[];total:number;page:number;pages:number};
 
 export default function Transactions(){
-  const sp=useSearchParams(),qc=useQueryClient(); const [modal,setModal]=useState<"create"|"edit"|"view"|null>(null),[selected,setSelected]=useState<Tx|null>(null),[type,setType]=useState("all"),[formType,setFormType]=useState("expense"),[page,setPage]=useState(1),[filters,setFilters]=useState({search:"",accountId:"",categoryId:"",from:"",to:"",minAmount:"",maxAmount:"",source:"",tag:"",sort:"newest"}),[filtersOpen,setFiltersOpen]=useState(false);
-  useEffect(()=>{if(sp.get("new"))setModal("create")},[sp]); useEffect(()=>setPage(1),[type,filters]);
+  const sp=useSearchParams(),qc=useQueryClient(); const [modal,setModal]=useState<"create"|"edit"|"view"|null>(null),[selected,setSelected]=useState<Tx|null>(null),[type,setTypeState]=useState("all"),[formType,setFormType]=useState("expense"),[page,setPage]=useState(1),[filters,setFiltersState]=useState({search:"",accountId:"",categoryId:"",from:"",to:"",minAmount:"",maxAmount:"",source:"",tag:"",sort:"newest"}),[filtersOpen,setFiltersOpen]=useState(false);
+  const [newRequest,setNewRequest]=useState<string|null>(null);
+  if(sp.get("new")!==newRequest){setNewRequest(sp.get("new"));if(sp.get("new"))setModal("create");}
+  const setType=(value:string)=>{setTypeState(value);setPage(1)};
+  const setFilters=(value:typeof filters)=>{setFiltersState(value);setPage(1)};
   const query=useMemo(()=>new URLSearchParams({type,page:String(page),limit:"20",...Object.fromEntries(Object.entries(filters).filter(([,v])=>v))}).toString(),[type,page,filters]);
   const q=useQuery({queryKey:["transactions",query],queryFn:()=>api<Result>(`/transactions?${query}`)}),summary=useQuery({queryKey:["transaction-summary"],queryFn:()=>api<Record<string,number>>("/transactions/summary/totals")}),aq=useQuery({queryKey:["accounts"],queryFn:()=>api<Account[]>("/accounts")}),cq=useQuery({queryKey:["categories"],queryFn:()=>api<Category[]>("/categories")}),gq=useQuery({queryKey:["goals"],queryFn:()=>api<Goal[]>("/goals")});
   const refresh=()=>{qc.invalidateQueries({queryKey:["transactions"]});qc.invalidateQueries({queryKey:["transaction-summary"]});qc.invalidateQueries({queryKey:["accounts"]});qc.invalidateQueries({queryKey:["dashboard"]});qc.invalidateQueries({queryKey:["budgets"]});qc.invalidateQueries({queryKey:["goals"]});qc.invalidateQueries({queryKey:["net-worth"]})};

@@ -8,3 +8,26 @@ export type Recurring={_id:string;title:string;type:string;amount:number;account
 export type Liability={_id:string;name:string;type:string;lender?:string;originalAmount:number;outstandingAmount:number;interestRate:number;emiAmount:number;paymentDay?:number;accountId?:Account;status:string;creditLimit?:number;statementDay?:number;dueDay?:number};
 export type Holding={_id:string;name:string;type:string;units:number;averageBuyPrice:number;investedAmount:number;currentValue:number;accountId?:Account;notes?:string};
 export type Notification={_id:string;type:string;title:string;message:string;isRead:boolean;actionUrl?:string;createdAt:string};
+export type SinkingFund={_id:string;name:string;targetAmount:number;currentAmount:number;targetDate?:string;requiredMonthlyContribution:number;monthlyContribution?:number;linkedAccountId?:Account;categoryId?:Category;status:"active"|"completed"|"paused"|"archived";createdAt:string;updatedAt:string};
+export type FinancialPreference={emergencyFundTargetMonths:number;essentialCategoryIds:string[];emergencyFundGoalId?:string;preferredDebtStrategy:"snowball"|"avalanche"|"custom";monthlySavingsTarget:number;monthlyInvestmentTarget:number;safeToSpendReserve:number;notificationPreferences:Record<string,boolean>;fireSettings:Record<string,number>};
+export type HealthScore={score:number;rating:"poor"|"fair"|"good"|"excellent";breakdown:{savingsRate:{score:number;max:number;detail:string};emergencyFund:{score:number;max:number;detail:string};debtBurden:{score:number;max:number;detail:string};budgetDiscipline:{score:number;max:number;detail:string};cashFlowStability:{score:number;max:number;detail:string};goalProgress:{score:number;max:number;detail:string}};explanation:string[]};
+export type SafeToSpend={status:"ok"|"insufficient_data"|"negative";availableCash:number;upcomingBills:number;plannedDebtPayments:number;plannedSavings:number;plannedInvestments:number;essentialReserve:number;safeToSpend:number;currencyCode?:string};
+export type DataConfidence={level:"high"|"medium"|"low";factors:Category;score:number};
+export type ForecastEvent={date:Date;description:string;amount:number;balance:number;kind:"income"|"expense"|"saving"|"investment"|"debt"|"bill"|"projected"};
+export type ForecastResult={events:ForecastEvent;period:{from:Date;to:Date};endingBalance:number;currencyCode?:string};
+export type EmergencyFundStatus={liquidEmergencySavings:number;monthlyEssentials:number;monthsCovered:number;totalMonthsTarget:number;targetMonths:number;gap:number;estimatedCompletionDate?:Date;milestone?:string};
+export type SinkingFundSummary={funds:SinkingFund;byStatus:Record<string,number>;totalTarget:number;totalSaved:number};
+export type SubscriptionAnalytics={monthlyTotal:number;annualTotal:number;count:number;subscriptions:Category[];currencyCode?:string};
+export type AnomalyCategory={type:string;categoryId?:Category;title?:string;current:number;previous:number;change:number;changePercent:number;currencyCode?:string};
+export type DebtPlan={order:Category[];strategy:string;extraPayment:number;payoffMonths:number;totalInterest:number;interestSaved:number;monthlyPayment:number;currencyCode?:string};
+export type GoalPlan={goalName:string;targetAmount:number;currentAmount:number;monthlyContribution:number;monthsToReach:number;estimatedCompletionDate:Date;totalContributors:number;currencyCode?:string};
+export type PortfolioByCategory={accountId?:string;name:string;value:number;percentage:number;gainLoss?:number;currencyCode?:string};
+export type PortfolioAnalysis={byType:PortfolioByCategory[];totalInvested:number;totalValue:number;totalGainLoss:number;holdings:Holding[];currencyCode?:string};
+export type FirePlan={currentPortfolio:number;monthlyContribution:number;yearsRemaining:number;estimatedFutureValue:number;fiTarget:number;gap:number;safeWithdrawalRate:number;monthlyExpenses:number;totalContributed:number;currencyCode?:string};
+export type FinanceDate={date:Date;title:string;amount:number;kind:"income"|"expense"|"saving"|"transfer"|"debt"|"sip"|"goal"|"sinking_fund";source?:string;recurringTransactionId?:string;account?:Account;category?:Category;details?:string};
+export type MonthlyReview={period:FinanceDate;income:number;expenses:number;savings:number;investments:number;debtReduction:number;netWorthChange:number;savingsRate:number;budgetPerformance:Category[];goalProgress:Category[];insights:string[];priorities:string[];previousPeriod:FinanceDate};
+export type Recommendation={id:string;type:string;priority:"low"|"medium"|"high";title:string;description:string;reason:string;potentialImpact?:string;actionUrl?:string};
+export type FinancialContext={period:FinanceDate;income:number;expenses:number;savings:number;investments:number;debt:number;netWorth:number;budgets:Category[];goals:Goal[];upcomingBills:Category[];healthScore:HealthScore;safeToSpend:SafeToSpend;anomalies:AnomalyCategory[];recommendations:Recommendation[];currencyCode?:string};
+export type T="income"|"expense"|"saving"|"investment"|"transfer";
+
+

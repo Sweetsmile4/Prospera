@@ -1,11 +1,33 @@
 "use client";
 import Link from "next/link";
 import { usePathname,useRouter } from "next/navigation";
-import { LayoutDashboard,ArrowLeftRight,WalletCards,Target,ChartNoAxesCombined,PiggyBank,LogOut,Menu,X,Settings,Repeat2,Landmark,LineChart,Bell } from "lucide-react";
+import { LayoutDashboard,ArrowLeftRight,WalletCards,Target,ChartNoAxesCombined,PiggyBank,LogOut,Menu,X,Settings,Repeat2,Landmark,LineChart,Bell,Calendar,Lightbulb,FlaskConical,CreditCard,Flame,PieChart,Search } from "lucide-react";
 import { useState } from "react";
 import { AuthGuard } from "./auth-guard";
 
-const nav=[["Dashboard","/dashboard",LayoutDashboard],["Transactions","/transactions",ArrowLeftRight],["Accounts","/accounts",WalletCards],["Budgets","/budgets",PiggyBank],["Goals","/goals",Target],["Investments","/investments",LineChart],["Liabilities","/liabilities",Landmark],["Bills & Recurring","/recurring",Repeat2],["Net Worth","/net-worth",ChartNoAxesCombined],["Reports","/reports",ChartNoAxesCombined],["Notifications","/notifications",Bell],["Settings","/settings",Settings]] as const;
+const nav:readonly (readonly [string,string,typeof LayoutDashboard])[]=[
+  ["Dashboard","/dashboard",LayoutDashboard],
+  ["Transactions","/transactions",ArrowLeftRight],
+  ["Search","/search",Search],
+  ["Accounts","/accounts",WalletCards],
+  ["Budgets","/budgets",PiggyBank],
+  ["Goals","/goals",Target],
+  ["Sinking Funds","/sinking-funds",WalletCards],
+  ["Investments","/investments",LineChart],
+  ["Liabilities","/liabilities",Landmark],
+  ["Bills & Recurring","/recurring",Repeat2],
+  ["Net Worth","/net-worth",ChartNoAxesCombined],
+  ["Reports","/reports",ChartNoAxesCombined],
+  ["Monthly Review","/monthly-review",PieChart],
+  ["Calendar","/calendar",Calendar],
+  ["Insights","/insights",Lightbulb],
+  ["Planning","/planning",FlaskConical],
+  ["Debt Planner","/planning/debt",CreditCard],
+  ["FIRE Planner","/planning/fire",Flame],
+  ["Scenarios","/planning/scenarios",FlaskConical],
+  ["Notifications","/notifications",Bell],
+  ["Settings","/settings",Settings],
+];
 
 export function Shell({children}:{children:React.ReactNode}){
   const pathname=usePathname(),router=useRouter(),[mobileOpen,setMobileOpen]=useState(false);

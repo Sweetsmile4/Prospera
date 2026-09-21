@@ -7,7 +7,7 @@ import { AppError } from "../utils/errors";
 import { captureNetWorth } from "./netWorth";
 import { applyDomainImpact } from "./domainImpact";
 
-export type TxInput = { type: "income"|"expense"|"saving"|"investment"|"transfer"; title: string; amount: number; accountId: string; destinationAccountId?: string; categoryId?: string; goalId?: string; description?: string; transactionDate: Date;source?:"manual"|"recurring"|"import";tags?:string[];referenceNumber?:string;recurringTransactionId?:string;importBatchId?:string;scheduledDate?:Date;metadata?:{kind:"liability_payment"|"goal_withdrawal"|"investment_activity";liabilityId?:string;investmentHoldingId?:string;principalAmount?:number;interestAmount?:number;activity?:string;units?:number;costBasis?:number} };
+export type TxInput = { type: "income"|"expense"|"saving"|"investment"|"transfer"; title: string; amount: number; accountId: string; destinationAccountId?: string; categoryId?: string; goalId?: string; description?: string; transactionDate: Date;source?:"manual"|"recurring"|"import";tags?:string[];referenceNumber?:string;recurringTransactionId?:string;importBatchId?:string;scheduledDate?:Date;metadata?:{kind:"liability_payment"|"goal_withdrawal"|"investment_activity"|"sinking_fund_contribution";sinkingFundId?:string;liabilityId?:string;investmentHoldingId?:string;principalAmount?:number;interestAmount?:number;activity?:string;units?:number;costBasis?:number} };
 const impact = (t: TxInput, multiplier = 1) => {
   const changes = new Map<string, number>();
   const add = (id: string, amount: number) => changes.set(id, (changes.get(id) || 0) + amount * multiplier);
@@ -23,8 +23,8 @@ const impact = (t: TxInput, multiplier = 1) => {
 export const calculateImpact = impact;
 export async function validateTransaction(userId: Types.ObjectId, input: TxInput, session?: ClientSession) {
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new AppError(400, "Amount must be greater than zero");
-  if (input.destinationAccountId === input.accountId) throw new AppError(400, "Source and destination accounts must differ");
-  const ids = [input.accountId, input.destinationAccountId].filter(Boolean);
+  if (input.destinationAccountId === input.accountId && input.metadata?.kind!=="sinking_fund_contribution") throw new AppError(400, "Source and destination accounts must differ");
+  const ids = [...new Set([input.accountId, input.destinationAccountId].filter(Boolean))];
   const accounts = await Account.countDocuments({ _id: { $in: ids }, userId, isActive: true }).session(session || null);
   if (accounts !== ids.length) throw new AppError(400, "An account is invalid, inactive, or does not belong to you");
   if (input.type === "transfer" && !input.destinationAccountId) throw new AppError(400, "A destination account is required");
