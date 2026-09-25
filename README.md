@@ -193,7 +193,7 @@ Optional and non-destructive. Imports can store `originalDescription` and a deri
 
 ### Tests
 
-`npm test` runs 94 tests covering V1, V2, and V3 — including financial-health bounds and zero-income handling, safe-to-spend exclusions and insufficient-data paths, forecast non-mutation, emergency-fund math, sinking-fund requirements, subscription annual cost, anomaly history thresholds, snowball/avalanche ordering and planner non-mutation, goal-simulator non-mutation, portfolio allocation totals, FIRE configurable/zero assumptions, scenario non-mutation, monthly-review comparison and Infinity guards, net-worth double-count guards, credit-card payment exclusion, investment-vs-expense distinction, cross-user isolation, and financial-context security.
+`npm test` runs 118 tests covering V1, V2, and V3 — including financial-health bounds and zero-income handling, safe-to-spend exclusions and insufficient-data paths, forecast non-mutation, emergency-fund math, sinking-fund requirements, subscription annual cost, anomaly history thresholds, snowball/avalanche ordering and planner non-mutation, goal-simulator non-mutation, portfolio allocation totals, FIRE configurable/zero assumptions, scenario non-mutation, monthly-review comparison and Infinity guards, net-worth double-count guards, credit-card payment exclusion, investment-vs-expense distinction, cross-user isolation, financial-context security, notification-preference gating, attention-flag detection/resolution, and a cross-feature consistency regression (balances, analytics, budgets, net worth, forecast, safe-to-spend, and health score must agree after every transaction type).
 
 ## V3 roadmap
 
@@ -203,13 +203,13 @@ Direct bank/UPI/open-banking connections, live security prices or NAV, credit sc
 
 Deploy `Frontend` to Vercel with `NEXT_PUBLIC_API_URL` set to the public API URL. Deploy `Backend` to Render/Railway with the backend environment values, build command `npm ci && npm run build`, and start command `npm start`. Allow the backend origin in Atlas and set `FRONTEND_URL` to the Vercel domain.
 
-For local development, recurring transactions can be processed manually with `npm run process-recurring`. In production, a scheduled job (cron on Render/Railway) should hit the authenticated `/api/recurring/process` endpoint automatically. Generation is idempotent, so repeated runs are safe.
+Recurring transactions are processed by an internal worker: run `npm run process-recurring` once per day in production (e.g. a daily cron/Render cron job pointing at that command). The worker is self-contained — it connects to MongoDB and generates every user's due transactions; generation is idempotent (a unique compound index per rule + scheduled date), so repeated or overlapping runs are safe. For platforms that only support HTTP schedulers, the equivalent endpoint is `POST /api/system/recurring/process` guarded by the `x-cron-secret` header matching `CRON_SECRET` (403 if unmatched, 503 if `CRON_SECRET` is not configured). Health checks can poll `GET /api/system/recurring/status` with the same header.
 
 ## V2 functionality
 
 V2 adds recurring transactions and bills, safe CSV/XLSX statement import with preview and duplicate decisions, transaction sources/tags/references, liabilities and credit-card payments, manually valued investment holdings, enhanced goals and withdrawals, in-app notifications, advanced reports, cash-flow analytics, CSV export, and deterministic financial insights.
 
-Recurring rules store their next due date. Run `npm run process-recurring` locally or invoke the authenticated processor endpoint from a scheduler. Generated transactions carry the recurring rule and scheduled date; a unique compound index makes generation idempotent.
+Recurring rules store their next due date. Run `npm run process-recurring` locally or in production; the `POST /api/system/recurring/process` endpoint (guarded by `CRON_SECRET`) exists for HTTP-only schedulers. Generated transactions carry the recurring rule and scheduled date; a unique compound index makes generation idempotent.
 
 Statement files are parsed in the browser with formulas disabled, limited to 5 MB and 5,000 rows, mapped by the user, sanitized, previewed by the API, and checked using account + date + amount + normalized description. Suspected duplicates are skipped unless the user explicitly selects “import anyway.” Imported transactions use the normal balance service and retain an import batch ID.
 
@@ -231,4 +231,4 @@ Insights and notifications are deterministic. They compare actual monthly totals
 - `/api/goals/:id/withdrawals`
 - `/api/transactions/export/csv`
 
-No new environment variables are required. A production deployment should call the recurring processor from an authenticated scheduled job and keep MongoDB configured as a replica set.
+Set `CRON_SECRET` (required only if you call the `/api/system` cron endpoints; otherwise optional). Keep MongoDB configured as a replica set. Production should run the recurring worker (`npm run process-recurring`) on a daily schedule, or call the secret-protected system endpoint from an HTTP scheduler.

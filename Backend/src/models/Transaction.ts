@@ -13,6 +13,7 @@ const transactionSchema = new Schema({
   originalDescription: { type: String, trim: true },
   normalizedMerchant: { type: String, trim: true, index: true },
   attentionFlags: [{ type: String, enum: ["uncategorized", "possible_duplicate", "possible_subscription", "unusual", "large_transaction"] }],
+  attentionResolved: [{ type: String }],
   source: { type: String, enum: ["manual", "recurring", "import"], default: "manual", index: true },
   tags: { type: [String], default: [] },
   referenceNumber: { type: String, trim: true },

@@ -1,7 +1,7 @@
 export type User={_id:string;name:string;email:string;currency:string};
 export type Account={_id:string;name:string;type:string;institutionName?:string;openingBalance:number;currentBalance:number;isActive:boolean};
 export type Category={_id:string;name:string;type:string;isDefault?:boolean;userId?:string|null};
-export type Tx={_id:string;type:"income"|"expense"|"saving"|"investment"|"transfer";title:string;amount:number;transactionDate:string;description?:string;accountId:Account;destinationAccountId?:Account;categoryId?:Category;goalId?:Goal;source:"manual"|"recurring"|"import";tags:string[];referenceNumber?:string;recurringTransactionId?:Recurring;importBatchId?:{_id:string;fileName:string};createdAt:string;updatedAt:string};
+export type Tx={_id:string;type:"income"|"expense"|"saving"|"investment"|"transfer";title:string;amount:number;transactionDate:string;description?:string;accountId:Account;destinationAccountId?:Account;categoryId?:Category;goalId?:Goal;source:"manual"|"recurring"|"import";tags:string[];attentionFlags?:string[];referenceNumber?:string;recurringTransactionId?:Recurring;importBatchId?:{_id:string;fileName:string};createdAt:string;updatedAt:string};
 export type Goal={_id:string;name:string;targetAmount:number;currentAmount:number;targetDate?:string;status:"active"|"completed"|"paused"|"archived"};
 export type Budget={_id:string;scope?:"category"|"overall";categoryId?:Category;month:number;year:number;limit:number;spent:number;remaining?:number;percentage?:number};
 export type Recurring={_id:string;title:string;type:string;amount:number;accountId:Account;destinationAccountId?:Account;frequency:string;startDate:string;nextRunDate:string;endDate?:string;isActive:boolean;notes?:string;isBill:boolean;autoCreate:boolean};
