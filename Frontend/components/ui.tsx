@@ -1,6 +1,6 @@
 "use client";
 import { AlertCircle, CheckCircle2, Info, Loader2, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { money } from "@/lib/api";
 
 export function cx(...x: (string | false | null | undefined)[]) { return x.filter(Boolean).join(" ") }
@@ -85,12 +85,13 @@ export function EmptyState({ icon, title, body, action, className }: { icon?: Re
 }
 
 export function ErrorState({ title = "Couldn't load this", message, onRetry }: { title?: string; message?: string; onRetry?: () => void }) {
-  return <div className="card p-8">
+  const safeMessage = message && /^(We |Unable |Couldn['’]t |Please )/i.test(message) ? message : "Please try again. Your data has not been changed.";
+  return <div className="card p-8" role="alert">
     <div className="flex items-start gap-3">
       <div className="grid size-10 shrink-0 place-items-center rounded-full bg-dangerSoft text-danger" aria-hidden><AlertCircle size={18} /></div>
       <div className="min-w-0">
         <h3 className="font-semibold">{title}</h3>
-        {message && <p className="mt-0.5 text-sm text-muted">{message}</p>}
+        <p className="mt-0.5 text-sm text-muted">{safeMessage}</p>
         {onRetry && <button className="btn btn-secondary btn-sm mt-3" onClick={onRetry}>Try again</button>}
       </div>
     </div>
@@ -132,10 +133,11 @@ export function Stat({ label, value, hint }: { label: string; value: React.React
 }
 
 export function Chip({ children, active, onClick, className }: { children: React.ReactNode; active?: boolean; onClick?: () => void; className?: string }) {
-  return <button type="button" onClick={onClick} className={cx("rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors max-sm:flex-1", active ? "border-brand bg-brand-soft text-brand-strong" : "border-edge-strong bg-surface text-text2 hover:border-text2", className)}>{children}</button>;
+  return <button type="button" onClick={onClick} className={cx("rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors max-sm:flex-1", active ? "border-brand bg-brandSoft text-brandStrong" : "border-edge-strong bg-surface text-text2 hover:border-text2", className)}>{children}</button>;
 }
 
 export function Drawer({ open, onClose, side = "right", title, children, footer, flush, noHeader }: { open: boolean; onClose: () => void; side?: "left" | "right"; title?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; flush?: boolean; noHeader?: boolean }) {
+  const titleId = useId();
   useEffect(() => {
     if (!open) return;
     document.body.style.overflow = "hidden";
@@ -146,9 +148,9 @@ export function Drawer({ open, onClose, side = "right", title, children, footer,
   const sideCls = side === "right" ? "right-0 translate-x-full" : "left-0 -translate-x-full";
   return <>
     <div onClick={onClose} className={cx("fixed inset-0 z-50 bg-black/35 transition-opacity duration-300", open ? "opacity-100" : "pointer-events-none opacity-0")} aria-hidden />
-    <div role="dialog" aria-modal="true" className={cx("fixed top-0 z-50 flex h-full w-full max-w-sm flex-col bg-surface shadow-lg transition-transform duration-300", sideCls, open && "translate-x-0 max-sm:max-w-full")}>
+    <div role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby={title ? titleId : undefined} className={cx("fixed top-0 z-50 flex h-full w-full max-w-sm flex-col bg-surface shadow-lg transition-transform duration-300", sideCls, open && "translate-x-0 max-sm:max-w-full")}>
       {!noHeader && <div className="flex items-center justify-between border-b border-edge px-6 py-4">
-        <div className="text-lg font-semibold">{title}</div>
+        <div id={titleId} className="text-lg font-semibold">{title}</div>
         {title && <button className="btn-icon" onClick={onClose} aria-label="Close"><X size={18} /></button>}
       </div>}
       <div className={cx("min-h-0 flex-1 overflow-y-auto border-y border-edge", flush ? "" : "p-6")}>{children}</div>
@@ -158,11 +160,12 @@ export function Drawer({ open, onClose, side = "right", title, children, footer,
 }
 
 export function ConfirmDialog({ open, title, body, confirmLabel = "Delete", busy, onConfirm, onClose }: { open: boolean; title: string; body: React.ReactNode; confirmLabel?: string; busy?: boolean; onConfirm: () => void; onClose: () => void }) {
+  const titleId = useId();
   if (!open) return null;
   return <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4" onMouseDown={onClose}>
-    <div onMouseDown={e => e.stopPropagation()} className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-lg">
+    <div role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={e => e.stopPropagation()} className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-lg">
       <div className="grid size-10 place-items-center rounded-full bg-dangerSoft text-danger" aria-hidden><AlertCircle size={18} /></div>
-      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+      <h3 id={titleId} className="mt-4 text-lg font-semibold">{title}</h3>
       <div className="mt-1 text-sm text-muted">{body}</div>
       <div className="mt-6 flex items-center justify-end gap-3">
         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
