@@ -1,5 +1,5 @@
 {
-  "name": "finora-frontend",
+  "name": "prospera-frontend",
   "private": true,
   "scripts": {
     "dev": "next dev",

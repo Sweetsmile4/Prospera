@@ -1,15 +1,50 @@
-"use client";import{useState}from"react";import{useMutation,useQuery}from"@tanstack/react-query";import{api,money}from"@/lib/api";import{Page}from"@/components/page";
-type DebtOrder={name:string;outstandingAmount:number;interestRate:number;emiAmount:number};
-type DebtResult={order:DebtOrder[];strategy:string;extraPayment:number;payoffMonths:number;totalInterest:number;interestSaved:number;monthlyPayment:number;timeline:{month:number;debts:{name:string;balance:number;interest:number;payment:number}[]}[]};
-export default function DebtPlannerPage(){
- const [strategy,setStrategy]=useState<"snowball"|"avalanche">("avalanche"),[extra,setExtra]=useState(0);
- const plan=useMutation({mutationFn:(b:unknown)=>api<DebtResult>("/planning/debt",{method:"POST",body:JSON.stringify(b)})});
- return <Page title="Debt Payoff Planner" description="Simulate debt payoff strategies. This is a simulation — it does not modify your actual liabilities.">
- <div className="card p-5 mb-5"><form onSubmit={e=>{e.preventDefault();const fd=new FormData(e.currentTarget);plan.mutate({strategy:fd.get("strategy"),extraPayment:Number(fd.get("extra")||0)})}} className="flex flex-wrap items-end gap-4"><div><label className="label">Strategy</label><select name="strategy" className="field w-auto" value={strategy} onChange={e=>setStrategy(e.target.value as "snowball"|"avalanche")}><option value="snowball">Snowball (smallest balance first)</option><option value="avalanche">Avalanche (highest interest first)</option></select></div><div><label className="label">Extra monthly payment</label><input name="extra" type="number" step="0.01" min="0" value={extra} onChange={e=>setExtra(Number(e.target.value))} className="field w-40"/></div><button disabled={plan.isPending} className="btn btn-primary">{plan.isPending?"Calculating…":"Calculate payoff"}</button></form>{plan.error&&<p className="mt-3 text-red-600">{plan.error.message}</p>}</div>
- {plan.data&&<><div className="grid gap-4 md:grid-cols-4 mb-5"><div className="card p-5"><p className="text-sm text-muted">Strategy</p><p className="mt-1 text-lg font-bold capitalize">{plan.data.strategy}</p></div><div className="card p-5"><p className="text-sm text-muted">Payoff months</p><p className="mt-1 text-lg font-bold">{plan.data.payoffMonths}</p></div><div className="card p-5"><p className="text-sm text-muted">Total interest</p><p className="mt-1 text-lg font-bold">{money(plan.data.totalInterest)}</p></div><div className="card p-5"><p className="text-sm text-muted">Interest saved</p><p className="mt-1 text-lg font-bold text-brand">{money(plan.data.interestSaved)}</p></div></div>
- <div className="card p-5 mb-5"><h2 className="font-semibold mb-3">Payoff order</h2><div className="space-y-3">{plan.data.order.map((d,i)=><div key={i} className="flex items-center justify-between border-b py-3 last:border-0"><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-mint text-sm font-bold text-brand">{i+1}</span><div><p className="text-sm font-medium">{d.name}</p><p className="text-xs text-muted">{d.interestRate}% interest · {money(d.emiAmount)} EMI</p></div></div><span className="text-sm font-semibold">{money(d.outstandingAmount)}</span></div>)}</div></div>
- {plan.data.timeline?.length>0&&<div className="card p-5"><h2 className="font-semibold mb-3">Projection (first 12 months)</h2><div className="overflow-auto"><table className="w-full min-w-[400px]"><thead><tr><th>Month</th>{plan.data.order.map(d=><th key={d.name}>{d.name}</th>)}</tr></thead><tbody>{plan.data.timeline.slice(0,12).map((m,i)=><tr key={i}><td className="text-sm">{i+1}</td>{m.debts.map(d=><td key={d.name} className="text-sm">{d.balance>0?money(d.balance):"—"}</td>)}</tr>)}</tbody></table></div></div>}
- <p className="mt-4 text-xs text-muted">Simulation only. Payments are not automatically applied to your liabilities.</p></>}
- {!plan.data&&!plan.isPending&&<p className="text-muted text-center py-12">Select a strategy and calculate to see your debt payoff projection.</p>}
- </Page>;
+"use client";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { api, money } from "@/lib/api";
+import { Page } from "@/components/page";
+import { Alert, Field, MetricCard, Spinner } from "@/components/ui";
+
+type DebtOrder = { id: string; name: string; balance: number; rate: number; emi: number };
+type TimelineRow = { month: number; balance: number; interest: number; payment: number };
+type DebtResult = { strategy: string; status: "ok" | "insufficient_data" | "not_amortizing"; order: DebtOrder[]; totalInterest: number; interestSaved: number | null; payoffMonths: number | null; debtFreeDate: string | null; monthlyPayment: number; timeline: TimelineRow[]; assumptions: string[] };
+
+export default function DebtPlannerPage() {
+  const [strategy, setStrategy] = useState<"snowball" | "avalanche">("avalanche"), [extra, setExtra] = useState(0);
+  const plan = useMutation({ mutationFn: (b: unknown) => api<DebtResult>("/planning/debt", { method: "POST", body: JSON.stringify(b) }) });
+  return <Page title="Debt Payoff Planner" description="Simulate debt payoff strategies. This is a simulation — it does not modify your actual liabilities.">
+    <div className="grid items-start gap-5 xl:grid-cols-[minmax(320px,.72fr)_minmax(0,1.28fr)]">
+    <div className="xl:sticky xl:top-20"><div className="card p-5">
+      <p className="mb-1 text-xs font-bold uppercase tracking-[.1em] text-brand">Editable assumptions</p>
+      <h2 className="mb-4 text-lg font-semibold">Payoff strategy</h2>
+      <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); plan.mutate({ strategy: fd.get("strategy"), extraPayment: Number(fd.get("extra") || 0) }); }} className="flex flex-wrap items-end gap-4">
+        <Field label="Strategy" className="w-full"><select name="strategy" className="field" value={strategy} onChange={e => setStrategy(e.target.value as "snowball" | "avalanche")}><option value="snowball">Snowball (smallest balance first)</option><option value="avalanche">Avalanche (highest interest first)</option></select></Field>
+        <Field label="Extra monthly payment" className="w-full"><input name="extra" type="number" step="0.01" min="0" value={extra} onChange={e => setExtra(Number(e.target.value))} className="field tnum" /></Field>
+        <button disabled={plan.isPending} className="btn btn-primary w-full">{plan.isPending ? <><Spinner className="mr-2" />Calculating…</> : "Calculate payoff"}</button>
+      </form>
+      {plan.error && <Alert tone="danger" className="mt-4">{plan.error.message}</Alert>}
+    </div><p className="mt-3 text-xs text-muted">Projection only. Payments are never applied automatically.</p></div>
+    <div className="min-w-0">
+    {plan.data && <>
+      {plan.data.status !== "ok" && <Alert tone="warning" className="mb-4">{plan.data.status === "insufficient_data" ? "Add a minimum monthly payment to every active debt to generate a payoff projection." : "Your current minimum payments never fully amortize this debt (600-month projection). Try a higher extra monthly payment."}</Alert>}
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+        <MetricCard label="Strategy" value={<span className="capitalize">{plan.data.strategy}</span>} />
+        <MetricCard label="Payoff months" value={plan.data.payoffMonths ?? "—"} />
+        <MetricCard label="Total interest" value={money(plan.data.totalInterest)} tone="warning" />
+        <MetricCard label="Interest saved" value={plan.data.interestSaved === null ? "—" : money(plan.data.interestSaved)} tone="success" />
+      </div>
+      <div className="card mb-5 p-6">
+        <div className="mb-1 flex items-center justify-between"><h2 className="text-lg font-semibold">Payoff order</h2>{plan.data.debtFreeDate && <span className="text-sm text-muted">Debt-free by <span className="font-semibold">{new Date(plan.data.debtFreeDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</span></span>}</div>
+        <p className="mb-4 text-sm text-muted">Monthly payment: <b className="tnum">{money(plan.data.monthlyPayment)}</b></p>
+        <div className="space-y-3">{plan.data.order.map((d, i) => <div key={d.id} className="flex items-center justify-between gap-4 rounded-lg border border-edge px-4 py-3"><div className="flex min-w-0 items-center gap-3"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-brandSoft text-sm font-bold text-brand">{i + 1}</span><div className="min-w-0"><p className="truncate text-sm font-medium">{d.name}</p><p className="text-xs text-muted">{d.rate}% interest · {money(d.emi)} EMI</p></div></div><span className="tnum shrink-0 text-sm font-semibold">{money(d.balance)}</span></div>)}</div>
+      </div>
+      {plan.data.status === "ok" && plan.data.timeline.length > 0 && <div className="card p-6"><h2 className="mb-3 text-lg font-semibold">Projection (first 12 months)</h2>
+        <div className="overflow-auto"><table className="w-full min-w-[400px]"><thead><tr><th className="text-left">Month</th><th className="text-right">Total balance</th><th className="text-right">Monthly interest</th><th className="text-right">Monthly payment</th></tr></thead><tbody>{plan.data.timeline.slice(0, 12).map((m, i) => <tr key={i}><td className="tnum">{m.month}</td><td className="tnum text-right">{money(m.balance)}</td><td className="tnum text-right">{money(m.interest)}</td><td className="tnum text-right font-semibold">{money(m.payment)}</td></tr>)}</tbody></table></div>
+        <details className="mt-4 text-sm text-muted"><summary>Assumptions</summary>{plan.data.assumptions.map(a => <p className="mt-1.5" key={a}>{a}</p>)}</details>
+      </div>}
+      <p className="mt-4 text-xs text-muted">Simulation only. Payments are not automatically applied to your liabilities.</p>
+    </>}
+    {!plan.data && !plan.isPending && <div className="card grid min-h-[420px] place-items-center p-8 text-center"><div><p className="font-semibold">Your payoff projection</p><p className="mt-1 text-sm text-muted">Select a strategy and calculate to compare payoff timing and interest.</p></div></div>}
+    </div></div>
+  </Page>;
 }

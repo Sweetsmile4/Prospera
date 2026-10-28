@@ -1,3 +1,11 @@
-export function Page({title,description,action,children}:{title:string;description?:string;action?:React.ReactNode;children:React.ReactNode}){return <div className="mx-auto w-full max-w-[1600px] px-8 py-8 max-md:px-4 max-md:py-5"><div className="mb-8 flex items-center justify-between gap-6 max-sm:flex-col max-sm:items-start"><div><h1 className="text-3xl font-bold tracking-tight max-md:text-2xl">{title}</h1>{description&&<p className="mt-1 text-sm text-muted">{description}</p>}</div>{action}</div>{children}</div>}
-export function Empty({text}:{text:string}){return <div className="card grid min-h-52 place-items-center p-8 text-center text-muted">{text}</div>}
-export function Progress({value}:{value:number}){return <div className="h-2 overflow-hidden rounded-full bg-[#edf1ef]"><div className={`h-full rounded-full ${value>100?"bg-red-500":value>80?"bg-amber-500":"bg-brand"}`} style={{width:`${Math.min(value,100)}%`}}/></div>}
+"use client";
+import { PageHeader, ProgressBar } from "@/components/ui";
+
+export function Page({ title, description, action, children }: { title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return <div className="mx-auto w-full max-w-[1600px] px-8 py-10 max-md:px-4 max-md:py-6">
+    <PageHeader title={title} description={description} actions={action} />
+    {children}
+  </div>;
+}
+export function Empty({ text }: { text: string }) { return <div className="card grid min-h-40 place-items-center p-8 text-center text-sm text-muted">{text}</div> }
+export function Progress({ value }: { value: number }) { return <ProgressBar value={value} /> }

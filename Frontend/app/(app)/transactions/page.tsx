@@ -3,33 +3,119 @@ import { TransactionFormV2 } from "@/components/transaction-form-v2";
 import { TransactionDetailsV2 } from "@/components/transaction-details-v2";
 import { ExportTransactions } from "@/components/export-transactions";
 import { NeedsAttention } from "@/components/needs-attention";
-import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query"; import { useSearchParams } from "next/navigation"; import Link from "next/link"; import { useMemo,useState } from "react"; import { api,money } from "@/lib/api"; import type { Account,Category,Goal,Tx } from "@/lib/types"; import { Page,Empty } from "@/components/page"; import { Modal } from "@/components/modal"; import { Trash2,Pencil,Eye,Search,SlidersHorizontal } from "lucide-react";
-const types=["all","income","expense","saving","investment","transfer"] as const;
-type Result={items:Tx[];total:number;page:number;pages:number};
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { api, money } from "@/lib/api";
+import type { Account, Category, Goal, Tx } from "@/lib/types";
+import { Page } from "@/components/page";
+import { Modal } from "@/components/modal";
+import { Badge, Chip, EmptyState, ErrorState, Skeleton, cx } from "@/components/ui";
+import { Trash2, Pencil, Eye, Search, SlidersHorizontal, ArrowDownLeft, ArrowUpRight, PiggyBank, TrendingUp } from "lucide-react";
 
-export default function Transactions(){
-  const sp=useSearchParams(),qc=useQueryClient(); const [modal,setModal]=useState<"create"|"edit"|"view"|null>(null),[selected,setSelected]=useState<Tx|null>(null),[type,setTypeState]=useState("all"),[formType,setFormType]=useState("expense"),[page,setPage]=useState(1),[filters,setFiltersState]=useState({search:"",accountId:"",categoryId:"",from:"",to:"",minAmount:"",maxAmount:"",source:"",tag:"",sort:"newest"}),[filtersOpen,setFiltersOpen]=useState(false);
-  const [newRequest,setNewRequest]=useState<string|null>(null);
-  if(sp.get("new")!==newRequest){setNewRequest(sp.get("new"));if(sp.get("new"))setModal("create");}
-  const setType=(value:string)=>{setTypeState(value);setPage(1)};
-  const setFilters=(value:typeof filters)=>{setFiltersState(value);setPage(1)};
-  const query=useMemo(()=>new URLSearchParams({type,page:String(page),limit:"20",...Object.fromEntries(Object.entries(filters).filter(([,v])=>v))}).toString(),[type,page,filters]);
-  const q=useQuery({queryKey:["transactions",query],queryFn:()=>api<Result>(`/transactions?${query}`)}),summary=useQuery({queryKey:["transaction-summary"],queryFn:()=>api<Record<string,number>>("/transactions/summary/totals")}),aq=useQuery({queryKey:["accounts"],queryFn:()=>api<Account[]>("/accounts")}),cq=useQuery({queryKey:["categories"],queryFn:()=>api<Category[]>("/categories")}),gq=useQuery({queryKey:["goals"],queryFn:()=>api<Goal[]>("/goals")});
-  const refresh=()=>{qc.invalidateQueries({queryKey:["transactions"]});qc.invalidateQueries({queryKey:["transaction-summary"]});qc.invalidateQueries({queryKey:["accounts"]});qc.invalidateQueries({queryKey:["dashboard"]});qc.invalidateQueries({queryKey:["budgets"]});qc.invalidateQueries({queryKey:["goals"]});qc.invalidateQueries({queryKey:["net-worth"]})};
-  const save=useMutation({mutationFn:({id,body}:{id?:string;body:unknown})=>api(id?`/transactions/${id}`:"/transactions",{method:id?"PUT":"POST",body:JSON.stringify(body)}),onSuccess:()=>{refresh();setModal(null);setSelected(null)}}),del=useMutation({mutationFn:(id:string)=>api(`/transactions/${id}`,{method:"DELETE"}),onSuccess:refresh});
-  const open=(mode:"edit"|"view",t:Tx)=>{setSelected(t);setFormType(t.type);setModal(mode)};
-  const submit=(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const f=new FormData(e.currentTarget),body:any={type:f.get("type"),title:f.get("title"),amount:Number(f.get("amount")),accountId:f.get("accountId"),transactionDate:f.get("transactionDate"),description:f.get("description"),source:selected?.source||"manual",tags:String(f.get("tags")||"").split(",").map(x=>x.trim().replace(/^#/,"").toLowerCase()).filter(Boolean),referenceNumber:f.get("referenceNumber")||undefined};for(const k of["destinationAccountId","categoryId","goalId"])if(f.get(k))body[k]=f.get(k);save.mutate({id:modal==="edit"?selected!._id:undefined,body})};
-  const cats=cq.data?.filter(c=>c.type===(formType==="income"?"income":formType==="investment"?"investment":"expense"));
-  return <Page title="Transactions" description="One accurate timeline of every financial movement." action={<div className="flex flex-wrap gap-2"><ExportTransactions/><Link className="btn btn-secondary" href="/transactions/import">Import statement</Link><button className="btn btn-primary" onClick={()=>{setSelected(null);setFormType("expense");setModal("create")}}>+ Add transaction</button></div>}>
-    <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[["Income",summary.data?.income||0,"text-brand"],["Expenses",summary.data?.expense||0,"text-red-600"],["Savings",summary.data?.saving||0,"text-blue-600"],["Investments",summary.data?.investment||0,"text-violet-600"]].map(([label,value,color])=><div className="card p-4" key={String(label)}><p className="text-sm text-muted">{label}</p><p className={`mt-1 text-xl font-bold ${color}`}>{money(Number(value))}</p></div>)}</div>
-    <NeedsAttention onEdit={(t)=>open("edit",t)}/>
-    <div className="mb-5 flex items-center justify-between gap-4"><div className="flex gap-2 overflow-x-auto">{types.map(t=><button key={t} onClick={()=>setType(t)} className={`rounded-full px-4 py-2 text-sm font-medium capitalize ${type===t?"bg-ink text-white":"bg-white text-muted"}`}>{t}</button>)}</div><button className="btn btn-secondary shrink-0" onClick={()=>setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16}/>Filters</button></div>
-    {filtersOpen&&<div className="card mb-5 grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-5"><label className="relative"><Search className="absolute left-3 top-3 text-muted" size={16}/><input className="field pl-9" placeholder="Title, notes, tag, reference" value={filters.search} onChange={e=>setFilters({...filters,search:e.target.value})}/></label><select className="field" value={filters.accountId} onChange={e=>setFilters({...filters,accountId:e.target.value})}><option value="">All accounts</option>{aq.data?.map(a=><option key={a._id} value={a._id}>{a.name}</option>)}</select><select className="field" value={filters.categoryId} onChange={e=>setFilters({...filters,categoryId:e.target.value})}><option value="">All categories</option>{cq.data?.map(c=><option key={c._id} value={c._id}>{c.name}</option>)}</select><select className="field" value={filters.source} onChange={e=>setFilters({...filters,source:e.target.value})}><option value="">All sources</option><option value="manual">Manual</option><option value="recurring">Recurring</option><option value="import">Import</option></select><input className="field" placeholder="Tag" value={filters.tag} onChange={e=>setFilters({...filters,tag:e.target.value.replace(/^#/,"")})}/><input aria-label="From date" className="field" type="date" value={filters.from} onChange={e=>setFilters({...filters,from:e.target.value})}/><input aria-label="To date" className="field" type="date" value={filters.to} onChange={e=>setFilters({...filters,to:e.target.value})}/><div className="flex gap-2"><input aria-label="Minimum amount" className="field min-w-0" type="number" placeholder="Min ₹" value={filters.minAmount} onChange={e=>setFilters({...filters,minAmount:e.target.value})}/><input aria-label="Maximum amount" className="field min-w-0" type="number" placeholder="Max ₹" value={filters.maxAmount} onChange={e=>setFilters({...filters,maxAmount:e.target.value})}/></div><select className="field" value={filters.sort} onChange={e=>setFilters({...filters,sort:e.target.value})}><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="highest">Highest amount</option><option value="lowest">Lowest amount</option></select><button className="text-sm font-semibold text-muted" onClick={()=>setFilters({search:"",accountId:"",categoryId:"",from:"",to:"",minAmount:"",maxAmount:"",source:"",tag:"",sort:"newest"})}>Clear filters</button></div>}
-    {q.isLoading?<p className="text-muted">Loading transactions…</p>:q.error?<p className="text-red-600">{q.error.message}</p>:q.data?.items.length?<><div className="card hidden overflow-x-auto md:block"><table className="w-full min-w-[800px]"><thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Account</th><th>Type</th><th>Amount</th><th>Actions</th></tr></thead><tbody>{q.data.items.map(t=><tr key={t._id}><td className="text-sm text-muted">{new Date(t.transactionDate).toLocaleDateString("en-IN")}</td><td className="font-medium">{t.title}{t.type==="transfer"&&<div className="text-xs text-muted">{t.accountId.name} → {t.destinationAccountId?.name}</div>}</td><td>{t.categoryId?.name||"—"}</td><td>{t.accountId.name}</td><td><span className="rounded-full bg-surface px-2 py-1 text-xs capitalize">{t.type}</span></td><td className={amountClass(t)}>{amountText(t)}</td><td><div className="flex gap-3 text-muted"><button aria-label="View" onClick={()=>open("view",t)}><Eye size={16}/></button><button aria-label="Edit" onClick={()=>open("edit",t)}><Pencil size={16}/></button><button aria-label="Delete" onClick={()=>confirm("Delete and reverse this transaction?")&&del.mutate(t._id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div><div className="space-y-3 md:hidden">{q.data.items.map(t=><article className="card p-4" key={t._id}><div className="flex justify-between gap-4"><div><p className="font-semibold">{t.title}</p><p className="text-xs text-muted">{new Date(t.transactionDate).toLocaleDateString("en-IN")} · {t.accountId.name}</p></div><p className={amountClass(t)}>{amountText(t)}</p></div><div className="mt-3 flex items-center justify-between"><span className="rounded-full bg-surface px-2 py-1 text-xs capitalize">{t.type}</span><div className="flex gap-4 text-muted"><button onClick={()=>open("view",t)}><Eye size={16}/></button><button onClick={()=>open("edit",t)}><Pencil size={16}/></button><button onClick={()=>confirm("Delete and reverse this transaction?")&&del.mutate(t._id)}><Trash2 size={16}/></button></div></div></article>)}</div><div className="mt-5 flex items-center justify-between"><p className="text-sm text-muted">{q.data.total} transactions · Page {q.data.page} of {Math.max(1,q.data.pages)}</p><div className="flex gap-2"><button className="btn btn-secondary" disabled={page<=1} onClick={()=>setPage(page-1)}>Previous</button><button className="btn btn-secondary" disabled={page>=q.data.pages} onClick={()=>setPage(page+1)}>Next</button></div></div></>:<Empty text="No transactions match this view."/>}
-    {(modal==="create"||modal==="edit")&&<Modal title={modal==="edit"?"Edit transaction":"Add transaction"} onClose={()=>setModal(null)}><TransactionFormV2 key={selected?._id||"new"} selected={selected} formType={formType} setFormType={setFormType} accounts={aq.data||[]} categories={cats||[]} goals={gq.data||[]} submit={submit} error={save.error?.message}/></Modal>}
-    {modal==="view"&&selected&&<Modal title="Transaction details" onClose={()=>setModal(null)}><TransactionDetailsV2 t={selected}/></Modal>}
+const types = ["all", "income", "expense", "saving", "investment", "transfer"] as const;
+type Result = { items: Tx[]; total: number; page: number; pages: number };
+
+const amountClass = (t: Tx) => `tnum font-semibold ${t.type === "income" ? "text-success" : t.type === "expense" ? "text-danger" : "text-info"}`;
+const amountText = (t: Tx) => `${t.type === "income" ? "+" : t.type === "expense" ? "−" : ""}${money(t.amount)}`;
+const typeBadge: Record<Tx["type"], "success" | "danger" | "info" | "soft" | "neutral"> = { income: "success", expense: "danger", saving: "info", investment: "info", transfer: "neutral" };
+
+export default function Transactions() {
+  const sp = useSearchParams(), qc = useQueryClient();
+  const [workspaceView, setWorkspaceView] = useState<"all" | "attention">("all");
+  const [modal, setModal] = useState<"create" | "edit" | "view" | null>(null), [selected, setSelected] = useState<Tx | null>(null), [type, setTypeState] = useState("all"), [formType, setFormType] = useState("expense"), [page, setPage] = useState(1), [filters, setFiltersState] = useState({ search: "", accountId: "", categoryId: "", from: "", to: "", minAmount: "", maxAmount: "", source: "", tag: "", sort: "newest" }), [filtersOpen, setFiltersOpen] = useState(false);
+  const [newRequest, setNewRequest] = useState<string | null>(null);
+  if (sp.get("new") !== newRequest) { setNewRequest(sp.get("new")); if (sp.get("new")) setModal("create"); }
+  const setType = (value: string) => { setTypeState(value); setPage(1) };
+  const setFilters = (value: typeof filters) => { setFiltersState(value); setPage(1) };
+  const query = useMemo(() => new URLSearchParams({ type, page: String(page), limit: "20", ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) }).toString(), [type, page, filters]);
+  const q = useQuery({ queryKey: ["transactions", query], queryFn: () => api<Result>(`/transactions?${query}`) }), summary = useQuery({ queryKey: ["transaction-summary"], queryFn: () => api<Record<string, number>>("/transactions/summary/totals") }), aq = useQuery({ queryKey: ["accounts"], queryFn: () => api<Account[]>("/accounts") }), cq = useQuery({ queryKey: ["categories"], queryFn: () => api<Category[]>("/categories") }), gq = useQuery({ queryKey: ["goals"], queryFn: () => api<Goal[]>("/goals") });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["transactions"] }); qc.invalidateQueries({ queryKey: ["transaction-summary"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); qc.invalidateQueries({ queryKey: ["budgets"] }); qc.invalidateQueries({ queryKey: ["goals"] }); qc.invalidateQueries({ queryKey: ["net-worth"] }) };
+  const save = useMutation({ mutationFn: ({ id, body }: { id?: string; body: unknown }) => api(id ? `/transactions/${id}` : "/transactions", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }), onSuccess: () => { refresh(); setModal(null); setSelected(null) } }), del = useMutation({ mutationFn: (id: string) => api(`/transactions/${id}`, { method: "DELETE" }), onSuccess: refresh });
+  const open = (mode: "edit" | "view", t: Tx) => { setSelected(t); setFormType(t.type); setModal(mode) };
+  const submit = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const f = new FormData(e.currentTarget), body: any = { type: f.get("type"), title: f.get("title"), amount: Number(f.get("amount")), accountId: f.get("accountId"), transactionDate: f.get("transactionDate"), description: f.get("description"), source: selected?.source || "manual", tags: String(f.get("tags") || "").split(",").map(x => x.trim().replace(/^#/, "").toLowerCase()).filter(Boolean), referenceNumber: f.get("referenceNumber") || undefined }; for (const k of ["destinationAccountId", "categoryId", "goalId"]) if (f.get(k)) body[k] = f.get(k); save.mutate({ id: modal === "edit" ? selected!._id : undefined, body }) };
+  const cats = cq.data?.filter(c => c.type === (formType === "income" ? "income" : formType === "investment" ? "investment" : "expense"));
+  const summaryItems = [
+    ["Income", "income", "bg-successSoft text-success", <ArrowDownLeft size={17} key="income" />],
+    ["Expenses", "expense", "bg-dangerSoft text-danger", <ArrowUpRight size={17} key="expense" />],
+    ["Savings", "saving", "bg-warningSoft text-warning", <PiggyBank size={17} key="saving" />],
+    ["Investments", "investment", "bg-infoSoft text-info", <TrendingUp size={17} key="investment" />],
+  ] as const;
+  const iconInput = "relative";
+  return <Page title="Transactions" description="One accurate timeline of every financial movement." action={<div className="flex flex-wrap gap-2"><ExportTransactions /><Link className="btn btn-secondary" href="/transactions/import">Import statement</Link><button className="btn btn-primary" onClick={() => { setSelected(null); setFormType("expense"); setModal("create") }}>+ Add transaction</button></div>}>
+    <div className="card mb-5 flex divide-x divide-edge overflow-x-auto px-5">
+      {summaryItems.map(([label, key, tone, icon]) => <div key={key} className="flex min-w-[180px] flex-1 items-center gap-3 px-5 py-4 first:pl-0 last:pr-0">
+        <span className={cx("grid size-9 shrink-0 place-items-center rounded-full", tone)}>{icon}</span>
+        <div><p className="text-xs text-muted">{label}</p><p className="tnum text-lg font-bold tracking-tight">{money(Number(summary.data?.[key] || 0))}</p></div>
+      </div>)}
+    </div>
+    <div className="mb-5 flex w-fit rounded-lg border border-edge bg-panel p-1" role="tablist" aria-label="Transaction views">
+      <button role="tab" aria-selected={workspaceView === "all"} className={cx("rounded-md px-4 py-2 text-sm font-semibold transition-colors", workspaceView === "all" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink")} onClick={() => setWorkspaceView("all")}>All</button>
+      <button role="tab" aria-selected={workspaceView === "attention"} className={cx("rounded-md px-4 py-2 text-sm font-semibold transition-colors", workspaceView === "attention" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink")} onClick={() => setWorkspaceView("attention")}>Needs Attention</button>
+    </div>
+    {workspaceView === "attention" ? <NeedsAttention onEdit={(t) => open("edit", t)} /> : <>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex gap-2 overflow-x-auto pb-1">{types.map(t => <Chip key={t} active={type === t} onClick={() => setType(t)} className="capitalize">{t}</Chip>)}</div>
+      <button className="btn btn-secondary btn-sm" onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={15} />Filters</button>
+    </div>
+    {filtersOpen && <div className="card mb-5 grid gap-3 p-5 md:grid-cols-3 xl:grid-cols-6">
+      <label className={iconInput}><Search className="pointer-events-none absolute left-3 top-3 text-muted" size={16} /><input className="field pl-9" placeholder="Title, notes, tag, reference" value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} /></label>
+      <select className="field" value={filters.accountId} onChange={e => setFilters({ ...filters, accountId: e.target.value })}><option value="">All accounts</option>{aq.data?.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>
+      <select className="field" value={filters.categoryId} onChange={e => setFilters({ ...filters, categoryId: e.target.value })}><option value="">All categories</option>{cq.data?.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select>
+      <select className="field" value={filters.source} onChange={e => setFilters({ ...filters, source: e.target.value })}><option value="">All sources</option><option value="manual">Manual</option><option value="recurring">Recurring</option><option value="import">Import</option></select>
+      <input className="field" placeholder="Tag" value={filters.tag} onChange={e => setFilters({ ...filters, tag: e.target.value.replace(/^#/, "") })} />
+      <select className="field" value={filters.sort} onChange={e => setFilters({ ...filters, sort: e.target.value })}><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="highest">Highest amount</option><option value="lowest">Lowest amount</option></select>
+      <input aria-label="From date" className="field" type="date" value={filters.from} onChange={e => setFilters({ ...filters, from: e.target.value })} />
+      <input aria-label="To date" className="field" type="date" value={filters.to} onChange={e => setFilters({ ...filters, to: e.target.value })} />
+      <input aria-label="Minimum amount" className="field" type="number" placeholder="Min amount" value={filters.minAmount} onChange={e => setFilters({ ...filters, minAmount: e.target.value })} />
+      <input aria-label="Maximum amount" className="field" type="number" placeholder="Max amount" value={filters.maxAmount} onChange={e => setFilters({ ...filters, maxAmount: e.target.value })} />
+      <button className="text-sm font-semibold text-muted transition-colors hover:text-ink" onClick={() => setFilters({ search: "", accountId: "", categoryId: "", from: "", to: "", minAmount: "", maxAmount: "", source: "", tag: "", sort: "newest" })}>Clear filters</button>
+    </div>}
+    {q.isLoading ? <div className="card space-y-0">
+      {[0, 1, 2, 3, 4].map(i => <div className="flex items-center gap-4 border-b border-edge px-5 py-4 last:border-b-0" key={i}><Skeleton className="h-3.5 w-24" /><Skeleton className="h-3.5 w-48" /><Skeleton className="h-3.5 w-20" /></div>)}
+    </div>
+      : q.error ? <ErrorState message={q.error.message} onRetry={() => q.refetch()} />
+      : q.data?.items.length ? <>
+        <div className="card hidden overflow-x-auto !p-0 md:block">
+          <table className="w-full min-w-[820px]">
+            <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Account</th><th>Type</th><th className="numeric">Amount</th><th className="text-right">Actions</th></tr></thead>
+            <tbody>{q.data.items.map(t => <tr key={t._id}>
+              <td className="whitespace-nowrap text-sm text-muted">{new Date(t.transactionDate).toLocaleDateString("en-IN")}</td>
+              <td className="font-medium">{t.title}{t.type === "transfer" && <div className="text-xs text-muted">{t.accountId.name} → {t.destinationAccountId?.name}</div>}</td>
+              <td className="text-muted">{t.categoryId?.name || "—"}</td>
+              <td className="text-sm text-muted">{t.accountId.name}</td>
+              <td><Badge tone={typeBadge[t.type]} className="capitalize">{t.type}</Badge></td>
+              <td className={amountClass(t)}>{amountText(t)}</td>
+              <td><div className="flex justify-end gap-1 text-muted">
+                <button className="btn-icon" aria-label="View" onClick={() => open("view", t)}><Eye size={16} /></button>
+                <button className="btn-icon" aria-label="Edit" onClick={() => open("edit", t)}><Pencil size={15} /></button>
+                <button className="btn-icon hover:!bg-dangerSoft hover:!text-danger" aria-label="Delete" onClick={() => confirm("Delete and reverse this transaction?") && del.mutate(t._id)}><Trash2 size={16} /></button>
+              </div></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <div className="space-y-3 md:hidden">{q.data.items.map(t => <article className="card !p-0" key={t._id}>
+          <div className="flex items-start justify-between gap-3 p-4 pb-2">
+            <div className="min-w-0"><p className="font-semibold">{t.title}</p><p className="mt-0.5 text-xs text-muted">{new Date(t.transactionDate).toLocaleDateString("en-IN")} · {t.accountId.name}</p></div>
+            <p className={amountClass(t)}>{amountText(t)}</p>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-edge px-4 py-2.5">
+            <Badge tone={typeBadge[t.type]} className="capitalize">{t.type}</Badge>
+            <div className="flex gap-1 text-muted">
+              <button className="btn-icon" aria-label="View" onClick={() => open("view", t)}><Eye size={16} /></button>
+              <button className="btn-icon" aria-label="Edit" onClick={() => open("edit", t)}><Pencil size={15} /></button>
+              <button className="btn-icon hover:!bg-dangerSoft hover:!text-danger" aria-label="Delete" onClick={() => confirm("Delete and reverse this transaction?") && del.mutate(t._id)}><Trash2 size={16} /></button>
+            </div>
+          </div>
+        </article>)}</div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">{q.data.total} transactions · Page {q.data.page} of {Math.max(1, q.data.pages)}</p>
+          <div className="flex gap-2"><button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="btn btn-secondary btn-sm" disabled={page >= q.data.pages} onClick={() => setPage(page + 1)}>Next</button></div>
+        </div>
+      </> : <EmptyState icon={<Search size={18} />} title="No transactions match this view" body="Try clearing the filters, or add a transaction to get started." action={<button className="btn btn-primary btn-sm" onClick={() => { setSelected(null); setFormType("expense"); setModal("create") }}>+ Add transaction</button>} />}
+    </>}
+    {(modal === "create" || modal === "edit") && <Modal title={modal === "edit" ? "Edit transaction" : "Add transaction"} onClose={() => setModal(null)}><TransactionFormV2 key={selected?._id || "new"} selected={selected} formType={formType} setFormType={setFormType} accounts={aq.data || []} categories={cats || []} goals={gq.data || []} submit={submit} error={save.error?.message} /></Modal>}
+    {modal === "view" && selected && <Modal title="Transaction details" onClose={() => setModal(null)}><TransactionDetailsV2 t={selected} /></Modal>}
   </Page>;
 }
-function amountClass(t:Tx){return `font-semibold ${t.type==="income"?"text-brand":t.type==="expense"?"text-red-600":"text-blue-600"}`};function amountText(t:Tx){return `${t.type==="income"?"+":t.type==="expense"?"−":""}${money(t.amount)}`};
-function Detail({label,value}:{label:string;value:string}){return <div><dt className="label">{label}</dt><dd className="font-medium capitalize">{value}</dd></div>}
-function TransactionForm({selected,formType,setFormType,accounts,categories,goals,submit,error}:{selected:Tx|null;formType:string;setFormType:(v:string)=>void;accounts:Account[];categories:Category[];goals:Goal[];submit:(e:React.FormEvent<HTMLFormElement>)=>void;error?:string}){return <form onSubmit={submit} className="space-y-4"><label className="block"><span className="label">Type</span><select className="field" name="type" value={formType} onChange={e=>setFormType(e.target.value)}>{types.slice(1).map(x=><option key={x}>{x}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label><span className="label">Title</span><input className="field" name="title" defaultValue={selected?.title} required/></label><label><span className="label">Amount</span><input className="field" name="amount" type="number" min="0.01" step="0.01" defaultValue={selected?.amount} required/></label></div><label className="block"><span className="label">{formType==="income"?"Destination":"Source"} account</span><select className="field" name="accountId" defaultValue={selected?.accountId._id} required><option value="">Select account</option>{accounts.filter(a=>a.isActive||a._id===selected?.accountId._id).map(a=><option value={a._id} key={a._id}>{a.name}</option>)}</select></label>{["transfer","saving","investment"].includes(formType)&&<label className="block"><span className="label">Destination account {formType!=="transfer"&&"(optional)"}</span><select className="field" name="destinationAccountId" defaultValue={selected?.destinationAccountId?._id||""} required={formType==="transfer"}><option value="">{formType==="transfer"?"Select account":"No owned-account destination"}</option>{accounts.filter(a=>a.isActive||a._id===selected?.destinationAccountId?._id).map(a=><option value={a._id} key={a._id}>{a.name}</option>)}</select></label>}{["income","expense","investment"].includes(formType)&&<label className="block"><span className="label">Category</span><select className="field" name="categoryId" defaultValue={selected?.categoryId?._id||""}><option value="">Uncategorized</option>{categories.map(c=><option value={c._id} key={c._id}>{c.name}</option>)}</select></label>}{formType==="saving"&&<label className="block"><span className="label">Goal</span><select className="field" name="goalId" defaultValue={selected?.goalId?._id||""}><option value="">No goal</option>{goals.map(g=><option value={g._id} key={g._id}>{g.name}</option>)}</select></label>}<label className="block"><span className="label">Date</span><input className="field" name="transactionDate" type="date" defaultValue={selected?new Date(selected.transactionDate).toISOString().slice(0,10):new Date().toISOString().slice(0,10)} required/></label><label className="block"><span className="label">Notes</span><textarea className="field" name="description" rows={2} defaultValue={selected?.description}/></label>{error&&<p className="text-sm text-red-600">{error}</p>}<button className="btn btn-primary w-full">{selected?"Save changes":"Save transaction"}</button></form>}

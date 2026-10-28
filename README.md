@@ -1,6 +1,6 @@
-# Finora
+# Prospera
 
-Finora is a production-style personal finance manager focused on the complete picture: account balances, income, expenses, saving, investing, budgets, goals, net worth, and reports.
+Prospera is a production-style personal finance manager focused on the complete picture: account balances, income, expenses, saving, investing, budgets, goals, net worth, and reports.
 
 ## Stack and structure
 
@@ -36,7 +36,7 @@ The V1 client includes account edit/reactivation/history, transaction detail/edi
 
 ## V3 functionality
 
-V3 transforms Finora from a records-and-management tool into a decision-support tool. All V3 calculations are deterministic, explainable, and derived from real user data. No generative AI is used for any financial calculation.
+V3 transforms Prospera from a records-and-management tool into a decision-support tool. All V3 calculations are deterministic, explainable, and derived from real user data. No generative AI is used for any financial calculation.
 
 ### V3 features
 

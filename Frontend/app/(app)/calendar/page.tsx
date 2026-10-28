@@ -1,15 +1,38 @@
-"use client";import{useState}from"react";import{useQuery}from"@tanstack/react-query";import{api,money}from"@/lib/api";import{Page}from"@/components/page";
-type CalEvent={date:string;title:string;amount:number;kind:"income"|"expense"|"saving"|"transfer"|"debt"|"sip"|"goal"|"sinking_fund";source?:string;account?:{name:string};category?:{name:string};details?:string};
-const kindColor:Record<string,string>={income:"text-brand",expense:"text-red-600",saving:"text-blue-600",transfer:"text-muted",debt:"text-orange-600",sip:"text-purple-600",goal:"text-teal-600",sinking_fund:"text-amber-600"};
-const kindBg:Record<string,string>={income:"bg-green-50",expense:"bg-red-50",saving:"bg-blue-50",transfer:"bg-gray-50",debt:"bg-orange-50",sip:"bg-purple-50",goal:"bg-teal-50",sinking_fund:"bg-amber-50"};
-export default function CalendarPage(){
- const [months,setMonths]=useState(1);
- const q=useQuery({queryKey:["calendar",months],queryFn:()=>api<CalEvent[]>(`/calendar/financial?months=${months}`)});
- const grouped=q.data?Object.entries(q.data.reduce<Record<string,CalEvent[]>>((acc,e)=>{const d=new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});(acc[d]=acc[d]||[]).push(e);return acc},{})):[];
- return <Page title="Financial Calendar" description="Upcoming bills, EMIs, goals, and recurring events." action={<select className="field w-auto" value={months} onChange={e=>setMonths(Number(e.target.value))}>{[1,2,3,6].map(n=><option key={n} value={n}>{n} month{n>1?"s":""}</option>)}</select>}>
- {q.isLoading&&<p className="text-muted">Loading calendar…</p>}
- {q.error&&<p className="text-red-600">{q.error.message}</p>}
- {grouped.length?grouped.map(([date,events])=><div key={date} className="mb-6"><h2 className="mb-3 text-sm font-semibold text-muted">{date}</h2><div className="space-y-2">{events.map((e,i)=><div key={i} className={`flex items-center justify-between rounded-xl border px-4 py-3 ${kindBg[e.kind]||"bg-white"}`}><div className="flex items-center gap-3"><span className={`inline-block h-2 w-2 rounded-full ${kindColor[e.kind]||"bg-gray-400"}`}/><div><p className="text-sm font-medium">{e.title}</p><p className="text-xs text-muted">{e.kind}{e.account?` · ${e.account.name}`:""}{e.category?` · ${e.category.name}`:""}</p></div></div><span className={`text-sm font-semibold ${kindColor[e.kind]||""}`}>{money(e.amount)}</span></div>)}</div></div>):!q.isLoading&&<p className="text-muted text-center py-12">No upcoming financial events. Add recurring transactions to populate your calendar.</p>}
- <p className="text-xs text-muted">Events are projected from your recurring transactions, bills, and financial commitments.</p>
- </Page>;
+"use client";
+import Link from "next/link";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api, money } from "@/lib/api";
+import { Page } from "@/components/page";
+import { Badge, EmptyState, ErrorState, Skeleton } from "@/components/ui";
+import type { BadgeTone } from "@/components/ui";
+
+type CalEvent = { date: string; title: string; type: "income" | "bill" | "subscription" | "debt" | "emi" | "investment" | "saving" | "goal" | "sinking"; amount: number; actionUrl?: string };
+const kindTone: Record<string, BadgeTone> = { income: "success", bill: "warning", subscription: "warning", debt: "danger", emi: "danger", investment: "info", saving: "soft", goal: "info", sinking: "info" };
+const kindDot: Record<string, string> = { income: "bg-success", bill: "bg-warning", subscription: "bg-warning", debt: "bg-danger", emi: "bg-danger", investment: "bg-info", saving: "bg-brand", goal: "bg-info", sinking: "bg-info" };
+const kindChip: Record<string, string> = { income: "bg-successSoft", bill: "bg-warningSoft", subscription: "bg-warningSoft", debt: "bg-dangerSoft", emi: "bg-dangerSoft", investment: "bg-infoSoft", saving: "bg-brandSoft", goal: "bg-infoSoft", sinking: "bg-infoSoft" };
+const kindLabel: Record<string, string> = { income: "Income", bill: "Bill", subscription: "Subscription", debt: "Debt", emi: "EMI", investment: "Investment", saving: "Saving", goal: "Goal", sinking: "Sinking fund" };
+
+export default function CalendarPage() {
+  const [months, setMonths] = useState(1);
+  const q = useQuery({ queryKey: ["calendar", months], queryFn: () => api<CalEvent[]>(`/calendar/financial?months=${months}`) });
+  const grouped = q.data ? Object.entries(q.data.reduce<Record<string, CalEvent[]>>((acc, e) => { const d = new Date(e.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); (acc[d] = acc[d] || []).push(e); return acc }, {})) : [];
+  return <Page title="Financial Calendar" description="Upcoming bills, EMIs, goals, and recurring events." action={<select className="field w-auto" value={months} onChange={e => setMonths(Number(e.target.value))}>{[1, 2, 3, 6].map(n => <option key={n} value={n}>{n} month{n > 1 ? "s" : ""}</option>)}</select>}>
+    {q.isLoading && <div className="space-y-6">{[0, 1, 2].map(i => <div key={i} className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>)}</div>}
+    {q.error && <ErrorState message={q.error.message} onRetry={() => q.refetch()} />}
+    {grouped.length ? grouped.map(([date, events]) => <div key={date} className="mb-7">
+      <h2 className="mb-3 text-sm font-semibold text-muted">{date}</h2>
+      <div className="space-y-2">{events.map((e, i) => <div key={i} className={"flex flex-wrap items-center justify-between gap-3 rounded-xl border border-edge px-4 py-3 " + (kindChip[e.type] || "bg-surface")}>
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={"inline-block size-2 shrink-0 rounded-full " + (kindDot[e.type] || "bg-muted")} />
+          <p className="min-w-0 text-sm font-medium">{e.actionUrl ? <Link className="hover:text-brand" href={e.actionUrl}>{e.title}</Link> : e.title}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <Badge tone={kindTone[e.type] || "neutral"}>{kindLabel[e.type] || e.type}</Badge>
+          <span className="tnum text-sm font-semibold">{money(e.amount)}</span>
+        </div>
+      </div>)}</div>
+    </div>) : !q.isLoading && !q.error && <EmptyState title="No upcoming financial events" body="Events are projected from your recurring transactions, bills, goals, and sinking funds. Add some to populate this calendar." />}
+    {!q.error && <p className="mt-6 text-xs text-muted">Events are projected from your recurring transactions, bills, and financial commitments.</p>}
+  </Page>;
 }
